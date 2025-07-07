@@ -1,6 +1,7 @@
 *.mp3
 *.wav
 data/
+tmp/
 
 # === DON'T MODIFY BELOW
 

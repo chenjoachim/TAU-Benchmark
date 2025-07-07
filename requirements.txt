@@ -1,0 +1,7 @@
+google-genai
+pydub
+gdown
+yt-dlp
+black
+pandas
+tqdm
