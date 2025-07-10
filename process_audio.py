@@ -6,7 +6,7 @@ import uuid
 import pandas as pd
 from tqdm import tqdm
 
-from utils import download_from_google_drive, download_from_yt
+from utils import download_from_google_drive, download_from_yt, crop_audio
 
 MAX_AUDIO_LENGTH = 15  # seconds
 SUBSETS = [
@@ -25,9 +25,8 @@ SUBSETS = [
 
 def timestamp_to_ms(timestamp):
     """Convert a timestamp in the format 'HH:MM:SS' to milliseconds."""
-    print(timestamp)
     if timestamp is None or pd.isna(timestamp) or timestamp.strip() == "":
-        return None
+        return -1
     parts = list(map(int, timestamp.split(":")))
     if len(parts) == 2:  # MM:SS format
         minutes, seconds = parts
@@ -35,7 +34,8 @@ def timestamp_to_ms(timestamp):
     elif len(parts) == 3:  # HH:MM:SS format
         hours, minutes, seconds = parts
     else:
-        raise ValueError("Invalid timestamp format. Use 'HH:MM:SS' or 'MM:SS'.")
+        print(f"Invalid timestamp format: {timestamp}", file=sys.stderr)
+        return -1
 
     return (hours * 3600 + minutes * 60 + seconds) * 1000
 
@@ -119,11 +119,23 @@ def main(args):
     if "end" in df.columns:
         df["end_ms"] = df["end"].apply(timestamp_to_ms)
 
+    # Crop audio files if necessary
+    tqdm.pandas(desc="Cropping audio files")
+    df[["audio_path", "start_ms", "end_ms"]] = df.progress_apply(
+        lambda row: crop_audio(
+            row["audio_path"],
+            start_ms=row.get("start_ms", 0),
+            end_ms=row.get("end_ms", MAX_AUDIO_LENGTH * 1000),
+            output_format=args.format,
+            max_length=MAX_AUDIO_LENGTH * 1000,
+        ),
+        axis=1,
+    ).apply(pd.Series)
     # Drop start, end, link columns
-    df.drop(columns=["start", "end", "link"], inplace=True, errors="ignore")
+    df.drop(columns=["start", "end"], inplace=True, errors="ignore")
 
-    print(f"DataFrame shape: {df.shape}")
-    print(f"Data type: {type(df)}")
+    # print(f"DataFrame shape: {df.shape}")
+    # print(f"Data type: {type(df)}")
 
     # Save processed data to output file
     df.to_csv(args.output_file, index=False, encoding="utf-8")

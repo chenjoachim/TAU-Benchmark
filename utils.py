@@ -86,6 +86,20 @@ def download_from_yt(
         return ""
 
 
+def crop_audio(
+    audio_path: str, start_ms: int, end_ms: int, output_format="mp3", max_length=15000
+):
+    """Crop audio file from start_ms to end_ms."""
+    audio = pydub.AudioSegment.from_file(audio_path)
+    if start_ms < 0:
+        start_ms = 0
+    if end_ms < 0 or end_ms - start_ms > max_length:
+        end_ms = start_ms + max_length
+    cropped_audio = audio[start_ms : start_ms + max_length]
+    cropped_audio.export(audio_path, format=output_format)
+    return audio_path, start_ms, end_ms
+
+
 if __name__ == "__main__":
     # Example usage
     download_from_yt("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
