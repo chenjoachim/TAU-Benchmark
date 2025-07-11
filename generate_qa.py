@@ -10,28 +10,29 @@ from google import genai
 from google.genai import types
 
 # Prompt template for generating questions
-PROMPT_TEMPLATE = """Generate 3 multiple-choice questions in JSON format for audio: "%s".
+QUESTION_PER_AUDIO = 4
+PROMPT_TEMPLATE = f"""為音檔生成 {QUESTION_PER_AUDIO} 道測試題，測試模型能否從音檔中推斷出「%s」這個描述。
 
-Requirements:
-- Test local/cultural sound recognition abilities
-- Answers must be clearly derivable from the audio content
-- Focus on culturally-specific sounds, environments, or contexts
+目標：
+- 測試模型能否從音檔的聲音特徵判斷出描述中的資訊
+- 專注於文化特定的聲音、環境音、情境特徵
+- 答案選項應包含描述中的正確資訊以及合理的干擾項
 
-JSON format:
-{
-  "question": "[Question text]",
-  "options": {"A": "[Option A]", "B": "[Option B]", "C": "[Option C]", "D": "[Option D]"},
-  "answer": "[Letter]"
-}
+JSON 格式：
+{{
+  "question": "[問題文字]",
+  "options": {{"A": "[選項A]", "B": "[選項B]", "C": "[選項C]", "D": "[選項D]"}},
+  "answer": "[字母]"
+}}
 
-Example:
-{
-  "question": "根據這段聲音，請問此廣播最有可能來自下列哪一個場所？",
-  "options": {"A": "全聯福利中心", "B": "7-ELEVEN 便利商店", "C": "傳統菜市場", "D": "電影院售票口"},
+範例（假設音檔描述是「全聯福利中心的廣播聲」）：
+{{
+  "question": "根據這段音檔，此廣播最可能來自哪個場所？",
+  "options": {{"A": "全聯福利中心", "B": "7-ELEVEN", "C": "傳統市場", "D": "百貨公司"}},
   "answer": "A"
-}
+}}
 
-Generate 3 questions:
+生成 {QUESTION_PER_AUDIO} 道問題：
 """
 
 
@@ -53,7 +54,7 @@ def parse_json_response(response_text: str) -> Optional[List[Dict]]:
         questions = json.loads(json_content)
 
         # Validate response structure
-        if not isinstance(questions, list) or len(questions) != 3:
+        if not isinstance(questions, list) or len(questions) != QUESTION_PER_AUDIO:
             return None
 
         # Validate each question format
@@ -94,7 +95,7 @@ def generate_questions_for_audio(
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.5-pro",
                 contents=[
                     prompt,
                     types.Part.from_bytes(
@@ -113,8 +114,9 @@ def generate_questions_for_audio(
             if questions:
                 return questions
 
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error on attempt {attempt + 1}: {e}")
+            print(f"Attempt {attempt + 1} failed, retrying...")
 
     return None
 
@@ -178,8 +180,9 @@ def main():
 
         if questions:
             # Create new rows for each question
-            for question_data in questions:
+            for idx, question_data in enumerate(questions):
                 new_row = row.copy()
+                new_row["unique_id"] = f'{row["unique_id"]}_{idx:02d}'
                 new_row["question"] = question_data["question"]
                 new_row["A"] = question_data["options"]["A"]
                 new_row["B"] = question_data["options"]["B"]
@@ -195,8 +198,7 @@ def main():
             print(f"Generated {len(questions)} questions")
         else:
             print("Failed to generate questions")
-
-        break  # For now, process only the first file (remove this break to process all files)
+            
 
     # Save results
     try:
