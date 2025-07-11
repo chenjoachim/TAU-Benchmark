@@ -6,3 +6,4 @@ black
 pandas
 tqdm
 python-dotenv
+datasets
