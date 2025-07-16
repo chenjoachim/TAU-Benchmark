@@ -11,12 +11,13 @@ from google.genai import types
 
 # Prompt template for generating questions
 QUESTION_PER_AUDIO = 4
-PROMPT_TEMPLATE = f"""為音檔生成 {QUESTION_PER_AUDIO} 道測試題，測試模型能否從音檔中推斷出「%s」這個描述。
+PROMPT_TEMPLATE = f"""請為音檔和對應的描述「%s」生成 {QUESTION_PER_AUDIO} 道測試題，測試使用者能否從音檔中推斷出對應的描述。
 
 目標：
-- 測試模型能否從音檔的聲音特徵判斷出描述中的資訊
-- 專注於文化特定的聲音、環境音、情境特徵
+- 測試使用者聽到該音檔是否能做出包含場景、用途、類型等聯想
 - 答案選項應包含描述中的正確資訊以及合理的干擾項
+- 答案選項應可單獨從對應描述合理推論而得
+- 題目和答案選項不可包含音色和轉錄檔，或是任何語意相關資訊
 
 JSON 格式：
 {{
@@ -27,13 +28,17 @@ JSON 格式：
 
 範例（假設音檔描述是「全聯福利中心的廣播聲」）：
 {{
-  "question": "根據這段音檔，此廣播最可能來自哪個場所？",
+  "question": "你最有可能在哪個場所聽到這個廣播？",
   "options": {{"A": "全聯福利中心", "B": "7-ELEVEN", "C": "傳統市場", "D": "百貨公司"}},
   "answer": "A"
 }}
 
 生成 {QUESTION_PER_AUDIO} 道問題：
 """
+
+INPUT_COST = 1.25e-6
+AUDIO_COST = 1.25e-6
+OUTPUT_COST = 10e-6
 
 
 def parse_json_response(response_text: str) -> Optional[List[Dict]]:
@@ -80,9 +85,11 @@ def parse_json_response(response_text: str) -> Optional[List[Dict]]:
 
 def generate_questions_for_audio(
     client: genai.Client, audio_path: str, description: str, max_retries: int = 3
-) -> Optional[List[Dict]]:
+) -> tuple[Optional[List[Dict]], float]:
     """Generate questions for a single audio file with retry logic."""
-    prompt = PROMPT_TEMPLATE % description
+    prompt = PROMPT_TEMPLATE %(description.strip())
+
+    print(prompt[:30])
 
     # Read audio file
     try:
@@ -109,16 +116,23 @@ def generate_questions_for_audio(
                     )
                 ),
             )
-
+            output_cost = (response.usage_metadata.candidates_token_count + response.usage_metadata.thoughts_token_count) * OUTPUT_COST
+            input_cost = 0
+            for modality in response.usage_metadata.prompt_tokens_details:
+                if modality.modality == types.Modality.AUDIO:
+                    input_cost += modality.token_count * AUDIO_COST
+                elif modality.modality == types.Modality.TEXT:
+                    input_cost += modality.token_count * INPUT_COST
+            total_cost = input_cost + output_cost
             questions = parse_json_response(response.text)
             if questions:
-                return questions
+                return questions, total_cost
 
         except Exception as e:
             print(f"Error on attempt {attempt + 1}: {e}")
             print(f"Attempt {attempt + 1} failed, retrying...")
 
-    return None
+    return None, 0
 
 
 def parse_args():
@@ -173,8 +187,10 @@ def main():
     successful_count = 0
     total_questions = 0
 
+    total_cost = 0.0
+
     for index, row in tqdm(df.iterrows(), total=df.shape[0], desc="Processing Rows"):
-        questions = generate_questions_for_audio(
+        questions, cost = generate_questions_for_audio(
             client, row["audio_path"], row["description"], max_retries=args.max_retries
         )
 
@@ -198,7 +214,10 @@ def main():
             print(f"Generated {len(questions)} questions")
         else:
             print("Failed to generate questions")
-            
+
+        total_cost += cost
+        
+        # break
 
     # Save results
     try:
@@ -209,6 +228,8 @@ def main():
         print(f"Results saved to {args.output_file}")
     except Exception as e:
         print(f"Failed to save results: {e}")
+
+    print(f"Total API cost: ${total_cost:.6f}")
 
 
 if __name__ == "__main__":
