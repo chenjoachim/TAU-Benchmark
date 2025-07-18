@@ -18,6 +18,11 @@ def parse_args():
         required=True,
         help="Path to the input CSV file containing the dataset.",
     )
+    parser.add_argument(
+        "--private",
+        action='store_true',
+        help="If set, the dataset will be pushed as private.",
+    )
     return parser.parse_args()
 
 def main(args):
@@ -51,7 +56,7 @@ def main(args):
         # Create dataset with explicit features
         dataset = Dataset.from_pandas(type_df, features=features, preserve_index=False)
         
-        dataset.push_to_hub(args.repo_id, config_name=type_name, private=True)
+        dataset.push_to_hub(args.repo_id, config_name=type_name, private=args.private)
 
 if __name__ == "__main__":
     args = parse_args()
