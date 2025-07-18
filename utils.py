@@ -95,7 +95,7 @@ def crop_audio(
         start_ms = 0
     if end_ms < 0 or end_ms - start_ms > max_length:
         end_ms = start_ms + max_length
-    cropped_audio = audio[start_ms : start_ms + max_length]
+    cropped_audio = audio[start_ms : end_ms]
     cropped_audio.export(audio_path, format=output_format)
     return audio_path, start_ms, end_ms
 
