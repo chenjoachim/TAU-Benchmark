@@ -9,7 +9,7 @@ SAMPLING_RATE = 16000  # Hz
 
 
 def download_from_google_drive(
-    url, format="mp3", output_path="data/audio", output_id=None
+    url, format="mp3", output_path="data/audio", output_id=None, audio_idx=None
 ) -> str:
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -20,7 +20,10 @@ def download_from_google_drive(
         ].upper()  # Generate a unique ID if not provided
     # Extract the file ID from the URL
     file_id = url.split("/")[-2]
-    output_file = os.path.join(output_path, f"{output_id}.{format}")
+    if audio_idx:
+        output_file = os.path.join(output_path, f"{output_id}_{audio_idx}.{format}")
+    else:
+        output_file = os.path.join(output_path, f"{output_id}.{format}")
 
     os.makedirs("tmp", exist_ok=True)
 
@@ -41,7 +44,7 @@ def download_from_google_drive(
 
 
 def download_from_yt(
-    url, format="mp3", output_path="data/audio", output_id=None
+    url, format="mp3", output_path="data/audio", output_id=None, audio_idx=None
 ) -> str:
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -56,7 +59,10 @@ def download_from_yt(
     if not output_id:
         output_id = str(uuid.uuid4().hex)[:8].upper()
 
-    output_file = os.path.join(output_path, output_id)
+    if audio_idx:
+        output_file = os.path.join(output_path, f"{output_id}_{audio_idx}")
+    else:
+        output_file = os.path.join(output_path, output_id)
 
     ydl_opts = {
         "format": "bestaudio/best",
@@ -95,7 +101,7 @@ def crop_audio(
         start_ms = 0
     if end_ms < 0 or end_ms - start_ms > max_length:
         end_ms = start_ms + max_length
-    cropped_audio = audio[start_ms : end_ms]
+    cropped_audio = audio[start_ms:end_ms]
     cropped_audio.export(audio_path, format=output_format)
     return audio_path, start_ms, end_ms
 

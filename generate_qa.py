@@ -88,7 +88,7 @@ def generate_questions_for_audio(
     client: genai.Client, audio_path: str, description: str, max_retries: int = 3
 ) -> tuple[Optional[List[Dict]], float]:
     """Generate questions for a single audio file with retry logic."""
-    prompt = PROMPT_TEMPLATE %(description.strip())
+    prompt = PROMPT_TEMPLATE % (description.strip())
 
     print(prompt[:30])
 
@@ -117,7 +117,10 @@ def generate_questions_for_audio(
                     )
                 ),
             )
-            output_cost = (response.usage_metadata.candidates_token_count + response.usage_metadata.thoughts_token_count) * OUTPUT_COST
+            output_cost = (
+                response.usage_metadata.candidates_token_count
+                + response.usage_metadata.thoughts_token_count
+            ) * OUTPUT_COST
             input_cost = 0
             for modality in response.usage_metadata.prompt_tokens_details:
                 if modality.modality == types.Modality.AUDIO:
@@ -217,7 +220,7 @@ def main():
             print("Failed to generate questions")
 
         total_cost += cost
-        
+
         # break
 
     # Save results
