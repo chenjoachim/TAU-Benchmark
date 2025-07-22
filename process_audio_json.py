@@ -31,7 +31,7 @@ SUBSETS = [
 
 def timestamp_to_ms(timestamp):
     """Convert a timestamp in the format 'HH:MM:SS' to milliseconds."""
-    if timestamp is None or pd.isna(timestamp) or timestamp.strip() == "":
+    if timestamp is None or timestamp.strip() == "" or timestamp.strip() == "all":
         return -1
     parts = list(map(int, timestamp.split(":")))
     if len(parts) == 2:  # MM:SS format
@@ -79,7 +79,7 @@ def get_args():
     return parser.parse_args()
 
 
-def process_audio_download(row, args, audio_idx=1):
+def process_audio_download(row, args, audio_idx=1) -> tuple[str, bool]:
     """Helper function to download audio for a single row."""
     try:
         if "drive" in row[f"link_{audio_idx}"]:
@@ -113,7 +113,7 @@ def process_audio_download(row, args, audio_idx=1):
             f"Error downloading audio for {row['unique_id']} (link {audio_idx}): {e}",
             file=sys.stderr,
         )
-        return None
+        return "", False
 
 
 def main(args):
@@ -130,9 +130,10 @@ def main(args):
         for audio_idx in range(1, 4):
             if not row.get(f"link_{audio_idx}"):
                 continue
-            audio_path = process_audio_download(row, args)
+            audio_path, need_crop = process_audio_download(row, args, audio_idx)
             start_ms = timestamp_to_ms(row.get(f"start_{audio_idx}"))
             end_ms = timestamp_to_ms(row.get(f"end_{audio_idx}"))
+
             if audio_path:
                 audio_path, start_ms, end_ms = crop_audio(
                     audio_path,
@@ -140,6 +141,7 @@ def main(args):
                     end_ms,
                     args.format,
                     max_length=MAX_AUDIO_LENGTH * 1000,
+                    need_crop=need_crop,
                 )
                 audio_data.append(
                     {
@@ -160,6 +162,9 @@ def main(args):
             "end_1",
             "end_2",
             "end_3",
+            "check_1",
+            "check_2",
+            "check_3"
         ]:
             row.pop(key, None)
         with open(args.output_file, "a", encoding="utf-8") as out_f:
