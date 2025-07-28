@@ -11,6 +11,30 @@ from google import genai
 from google.genai import types
 
 # Prompt template for generating question
+# PROMPT_TEMPLATE = f"""根據音檔的聲音特徵、音檔描述「%s」和原始問題「%s」，請：
+
+# 1. 將原始問題換句話說 (保持原意不變）
+# 2. 提供正確答案和3個合理的混淆項
+
+# 要求：
+# - 題目和答案選項不得包含轉錄檔或任何語意相關資訊
+# - 答案要針對台灣價值設計
+# - 答案選項應包含描述中的正確資訊以及合理的干擾項
+# - 干擾選項和正確選項相近，但理解台灣文化的人不會被干擾
+# - 答案選項應可單獨從對應描述合理推論而得
+
+
+# JSON 格式：
+# {{
+#   "question": "[問題文字]",
+#   "options": {{"A": "[選項A]", "B": "[選項B]", "C": "[選項C]", "D": "[選項D]"}},
+#   "answer": "[字母]"
+# }}
+
+
+# 生成一道問題：
+# """
+
 PROMPT_TEMPLATE = f"""根據音檔的聲音特徵、音檔描述「%s」和原始問題「%s」，請：
 
 1. 將原始問題換句話說 (保持原意不變）
@@ -23,6 +47,20 @@ PROMPT_TEMPLATE = f"""根據音檔的聲音特徵、音檔描述「%s」和原�
 - 干擾選項和正確選項相近，但理解台灣文化的人不會被干擾
 - 答案選項應可單獨從對應描述合理推論而得
 
+干擾項設計要求：
+- 分析音檔中可能造成聽覺混淆的元素（如相似音、背景音、語調變化等）
+- 干擾選項應包含與正確答案高度相似的關鍵詞或概念
+- 在具體細節上做微妙變化（如數字、地名、人名、時間的些微差異）
+- 利用台灣常見的文化誤解或混淆概念作為干擾基礎
+- 每個干擾項都應該是「幾乎正確」但有一個關鍵錯誤的選項
+- 干擾項應反映聽者可能因為注意力分散、聽錯音節或文化背景差異而產生的合理誤解
+
+網路查證要求：
+- 必須使用網路搜尋驗證所有干擾項的真實性和存在性
+- 確保干擾項中提到的地名、人名、機構名稱、日期、數據等都是真實存在的
+- 避免使用虛構或不存在的資訊作為干擾項
+- 在設計完干擾項後，請逐一搜尋驗證每個選項的真實性
+- 如發現虛構資訊，請重新設計該干擾項並再次驗證
 
 JSON 格式：
 {{
@@ -31,9 +69,7 @@ JSON 格式：
   "answer": "[字母]"
 }}
 
-
-生成一道問題：
-"""
+生成一道問題"""
 
 CRAFTED_QUESTION = {
     "Transit": "這個聲音在什麼交通工具可以聽到？",
@@ -122,7 +158,10 @@ def generate_question_for_audio(
                 config=types.GenerateContentConfig(
                     thinking_config=types.ThinkingConfig(
                         thinking_budget=8192,
-                    )
+                    ),
+                    tools=[
+                        types.Tool(google_search=types.GoogleSearch())
+                    ]
                 ),
             )
             output_cost = (
@@ -238,8 +277,6 @@ def main():
             print("Failed to generate question")
 
         total_cost += cost
-
-        # break
 
     # Save results
     try:
