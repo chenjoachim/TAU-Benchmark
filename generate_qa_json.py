@@ -93,9 +93,6 @@ def generate_questions_for_audio(
 ) -> tuple[Optional[List[Dict]], float]:
     """Generate questions for a single audio file with retry logic."""
     prompt = PROMPT_TEMPLATE % (description.strip())
-
-    print(prompt[:30])
-
     # Read audio file
     try:
         with open(audio_path, "rb") as audio_file:
@@ -230,7 +227,7 @@ def main():
 
                 successful_count += 1
                 total_questions += len(questions)
-                print(f"Generated {len(questions)} questions")
+                # print(f"Generated {len(questions)} questions")
             else:
                 print("Failed to generate questions")
 
