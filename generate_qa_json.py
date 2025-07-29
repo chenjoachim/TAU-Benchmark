@@ -200,41 +200,41 @@ def main():
     total_cost = 0.0
 
     for index, row in enumerate(tqdm(data, total=len(data), desc="Processing Rows")):
-        questions, cost = generate_questions_for_audio(
-            client, row["audio"][0]["audio_path"], row["description"], max_retries=args.max_retries
-        )
+        for audio_idx in range(len(row["audio"])):
+            questions, cost = generate_questions_for_audio(
+                client, row["audio"][audio_idx]["audio_path"], row["description"], max_retries=args.max_retries
+            )
 
-        if questions:
-            # Create new rows for each question
-            for idx, question_data in enumerate(questions):
-                new_row = {}
-                new_row["type"] = row["type"]
-                new_row["description"] = row["description"]
-                audio_idx = idx % len(row["audio"])
-                new_row["link"] = row["audio"][audio_idx]["link"]
-                new_row["audio_path"] = row["audio"][audio_idx]["audio_path"]
-                new_row["start_ms"] = row["audio"][audio_idx]["start_ms"]
-                new_row["end_ms"] = row["audio"][audio_idx]["end_ms"]
-                
-                
-                new_row["unique_id"] = f'{row["unique_id"]}_{idx:02d}'
-                new_row["question"] = question_data["question"]
-                new_row["A"] = question_data["options"]["A"]
-                new_row["B"] = question_data["options"]["B"]
-                new_row["C"] = question_data["options"]["C"]
-                new_row["D"] = question_data["options"]["D"]
-                new_row["answer"] = question_data["answer"]
-                processed_df = pd.concat(
-                    [processed_df, pd.DataFrame([new_row])], ignore_index=True
-                )
+            if questions:
+                # Create new rows for each question
+                for idx, question_data in enumerate(questions):
+                    new_row = {}
+                    new_row["type"] = row["type"]
+                    new_row["description"] = row["description"]
+                    new_row["link"] = row["audio"][audio_idx]["link"]
+                    new_row["audio_path"] = row["audio"][audio_idx]["audio_path"]
+                    new_row["start_ms"] = row["audio"][audio_idx]["start_ms"]
+                    new_row["end_ms"] = row["audio"][audio_idx]["end_ms"]
+                    
+                    
+                    new_row["unique_id"] = f'{row["unique_id"]}_{idx:02d}'
+                    new_row["question"] = question_data["question"]
+                    new_row["A"] = question_data["options"]["A"]
+                    new_row["B"] = question_data["options"]["B"]
+                    new_row["C"] = question_data["options"]["C"]
+                    new_row["D"] = question_data["options"]["D"]
+                    new_row["answer"] = question_data["answer"]
+                    processed_df = pd.concat(
+                        [processed_df, pd.DataFrame([new_row])], ignore_index=True
+                    )
 
-            successful_count += 1
-            total_questions += len(questions)
-            print(f"Generated {len(questions)} questions")
-        else:
-            print("Failed to generate questions")
+                successful_count += 1
+                total_questions += len(questions)
+                print(f"Generated {len(questions)} questions")
+            else:
+                print("Failed to generate questions")
 
-        total_cost += cost
+            total_cost += cost
 
         # break
 
