@@ -1,8 +1,10 @@
+import csv
 import json
 import os
 from typing import List, Dict, Optional
 import argparse
 import random
+import uuid
 
 import pandas as pd
 from tqdm import tqdm
@@ -84,9 +86,9 @@ CRAFTED_QUESTION = {
     "Entertainment": "這首曲子是什麼歌曲或音樂？"
 }
 
-INPUT_COST = 1.25e-6
-AUDIO_COST = 1.25e-6
-OUTPUT_COST = 10e-6
+INPUT_COST = 0.3e-6
+AUDIO_COST = 1.0e-6
+OUTPUT_COST = 2.5e-6
 
 
 def parse_json_response(response_text: str) -> Optional[List[Dict]]:
@@ -235,7 +237,10 @@ def main():
 
     # Initialize output DataFrame
     output_columns = ["type", "description", "link", "unique_id", "audio_path", "start_ms", "end_ms", "question", "A", "B", "C", "D", "answer"]
-    processed_df = pd.DataFrame(columns=output_columns)
+    
+    # Write to output CSV
+    with open(args.output_file, "w", encoding='utf-8') as f:
+        f.write(",".join(output_columns) + "\n")
 
     successful_count = 0
     total_question = 0
@@ -243,50 +248,49 @@ def main():
     total_cost = 0.0
 
     for index, row in enumerate(tqdm(data, total=len(data), desc="Processing Rows")):
-        question, cost = generate_question_for_audio(
-            client, row["audio"][0]["audio_path"], row["description"], audio_class=row["type"], max_retries=args.max_retries
-        )
-
-        if question:
-            # Create new rows for each question
-            new_row = {}
-            new_row["type"] = row["type"]
-            new_row["description"] = row["description"]
-            audio_idx = random.randint(0, len(row["audio"]) - 1)
-            new_row["link"] = row["audio"][audio_idx]["link"]
-            new_row["audio_path"] = row["audio"][audio_idx]["audio_path"]
-            new_row["start_ms"] = row["audio"][audio_idx]["start_ms"]
-            new_row["end_ms"] = row["audio"][audio_idx]["end_ms"]
-            
-            
-            new_row["unique_id"] = f'{row["unique_id"]}_99'
-            new_row["question"] = question["question"]
-            new_row["A"] = question["options"]["A"]
-            new_row["B"] = question["options"]["B"]
-            new_row["C"] = question["options"]["C"]
-            new_row["D"] = question["options"]["D"]
-            new_row["answer"] = question["answer"]
-            processed_df = pd.concat(
-                [processed_df, pd.DataFrame([new_row])], ignore_index=True
+        for audio_idx in range(len(row["audio"])):
+            question, cost = generate_question_for_audio(
+                client, row["audio"][audio_idx]["audio_path"], row["description"], audio_class=row["type"], max_retries=args.max_retries
             )
 
-            successful_count += 1
-            total_question += 1
-            print(f"Generated 1 question")
-        else:
-            print("Failed to generate question")
+            if question:
+                # Create new rows for each question
+                new_row = {}
+                new_row["type"] = row["type"]
+                new_row["description"] = row["description"]
+                new_row["link"] = row["audio"][audio_idx]["link"]
+                new_row["audio_path"] = row["audio"][audio_idx]["audio_path"]
+                new_row["start_ms"] = row["audio"][audio_idx]["start_ms"]
+                new_row["end_ms"] = row["audio"][audio_idx]["end_ms"]
+                
+                
+                new_row["unique_id"] = uuid.uuid4().hex[:8].upper()
+                new_row["question"] = question["question"]
+                new_row["A"] = question["options"]["A"]
+                new_row["B"] = question["options"]["B"]
+                new_row["C"] = question["options"]["C"]
+                new_row["D"] = question["options"]["D"]
+                new_row["answer"] = question["answer"]
+                
+                # Append new row 
+                with open(args.output_file, "a", encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    new_row_data = [new_row[col] for col in output_columns]
+                    writer.writerow(new_row_data)
 
-        total_cost += cost
+                successful_count += 1
+                total_question += 1
+            else:
+                print("Failed to generate question")
+
+            total_cost += cost
+
 
     # Save results
-    try:
-        processed_df.to_csv(args.output_file, index=False)
-        print(
-            f"Generated {total_question} question from {successful_count} audio files"
-        )
-        print(f"Results saved to {args.output_file}")
-    except Exception as e:
-        print(f"Failed to save results: {e}")
+    print(
+        f"Generated {total_question} question from {successful_count} audio files"
+    )
+    print(f"Results saved to {args.output_file}")
 
     print(f"Total API cost: ${total_cost:.6f}")
 

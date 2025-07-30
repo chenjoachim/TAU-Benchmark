@@ -3,6 +3,7 @@ import os
 from typing import List, Dict, Optional
 import argparse
 import random
+import uuid
 
 import pandas as pd
 from tqdm import tqdm
@@ -214,7 +215,7 @@ def main():
                     new_row["end_ms"] = row["audio"][audio_idx]["end_ms"]
                     
                     
-                    new_row["unique_id"] = f'{row["unique_id"]}_{idx:02d}'
+                    new_row["unique_id"] = uuid.uuid4().hex[:8].upper()
                     new_row["question"] = question_data["question"]
                     new_row["A"] = question_data["options"]["A"]
                     new_row["B"] = question_data["options"]["B"]
