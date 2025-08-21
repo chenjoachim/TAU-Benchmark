@@ -7,7 +7,7 @@ import os
 import shutil
 import uuid
 
-SAMPLING_RATE = 16000  # Hz
+SAMPLING_RATE = 44100  # Hz
 
 
 def download_from_google_drive(
