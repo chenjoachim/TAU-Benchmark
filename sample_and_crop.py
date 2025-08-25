@@ -41,6 +41,11 @@ def parse_args():
         default="data/processed.jsonl",
         help="Path to the output JSONL file where processed audio metadata will be saved.",
     )
+    parser.add_argument(
+        "--verify_only",
+        action="store_true",
+        help="If set, only verify the validity of the JSONL file without processing audio.",
+    )
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -57,31 +62,43 @@ if __name__ == "__main__":
     success_count = 0
     os.makedirs(args.output_dir, exist_ok=True)
     
-    for row in tqdm(data):
+    for idx, row in enumerate(tqdm(data)):
+
         save_path = os.path.join(args.audio_dir, row['audioPath'].split("/")[-1])
 
         # Resample to sr
-        audio = AudioSegment.from_file(save_path)
-        audio = audio.set_frame_rate(SAMPLING_RATE)
+        if not args.verify_only:
+            audio = AudioSegment.from_file(save_path)
+            audio = audio.set_frame_rate(SAMPLING_RATE)
         
         # Crop according to start_ms and end_ms
-        start_ms = row.get('startMs', 0)
-        end_ms = row.get('endMs', len(audio))
+        start_ms = row.get('startMs', -1)
+        end_ms = row.get('endMs', -1)
         if start_ms < 0:
             start_ms = 0
             print(f"Warning: start_ms < 0 for {save_path}, setting to 0")
+        
+        if not args.verify_only and end_ms > len(audio):
+            print(f"Warning: end_ms > audio length for {save_path}, setting to audio length")
+            end_ms = len(audio)
+
         if end_ms < 0 or end_ms - start_ms > MAX_AUDIO_LENGTH:
+            if args.verify_only:
+                print(f"Warning: end_ms < 0 or too long for {save_path}, skipping verification")
+                continue
             end_ms = min(start_ms + MAX_AUDIO_LENGTH, len(audio))
             print(f"Warning: end_ms < 0 or too long for {save_path}, setting to {end_ms}")
-
-        new_row = row.copy()
-        new_row['startMs'] = start_ms
-        new_row['endMs'] = end_ms
-        output_data.append(new_row)
-        audio = audio[start_ms:end_ms]
-        output_path = os.path.join(args.output_dir, row['audioPath'].split("/")[-1])
-        audio.export(output_path, format="mp3")
         
-    with open(args.output_file, 'w') as f:
-        for item in output_data:
-            f.write(json.dumps(item) + "\n")
+        
+
+        if not args.verify_only:
+            new_row = row.copy()
+            new_row['startMs'] = start_ms
+            new_row['endMs'] = end_ms
+            output_data.append(new_row)
+            audio = audio[start_ms:end_ms]
+            output_path = os.path.join(args.output_dir, row['audioPath'].split("/")[-1])
+            audio.export(output_path, format="mp3")
+            
+            with open(args.output_file, '+a') as f:
+                f.write(json.dumps(new_row, ensure_ascii=False) + "\n")
