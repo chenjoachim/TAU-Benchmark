@@ -3,6 +3,9 @@
 data/
 tmp/
 
+distributed/
+output/
+
 # === DON'T MODIFY BELOW
 
 # Byte-compiled / optimized / DLL files
