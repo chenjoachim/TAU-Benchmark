@@ -71,7 +71,7 @@ def evaluate(
                 config=types.GenerateContentConfig(
                     thinking_config=types.ThinkingConfig(
                         thinking_budget=8192,
-                        include_thoughts=True
+                        # include_thoughts=True
                     )
                 ),
             )
@@ -89,7 +89,6 @@ def evaluate(
             total_cost = input_cost + output_cost
 
             if answer:
-                print(response)
                 return answer, total_cost
             else:
                 raise ValueError("Empty response")
