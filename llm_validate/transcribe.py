@@ -35,6 +35,7 @@ if __name__ == "__main__":
         tokenizer=processor.tokenizer,
         feature_extractor=processor.feature_extractor,
         torch_dtype=torch_dtype,
+        chunk_length_s=30,
         device=device,
     )
 
