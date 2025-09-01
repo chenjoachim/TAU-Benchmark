@@ -54,7 +54,7 @@ Now, extract the last mentioned answer option letter from the following response
             
         except Exception as e:
             print(f"[Retry {attempt+1}] Error: {e}")
-            time.sleep(3)
+            time.sleep(3 ** (attempt + 1))
     return None
 
 def eval_file(pred_file):
@@ -73,13 +73,13 @@ def eval_file(pred_file):
         response = raw_response.strip()
 
         pred = extract_with_llm(response)
-        item["predicted_answer"] = pred
+        item["predictedAnswer"] = pred
         item["correct"] = (pred == gt)
         
         if pred == gt:
             stats["correct"] += 1
         if pred is None:
-            print(f"Failed to extract answer for item: {item['id']}")
+            print(f"Failed to extract answer for item: {item['uniqueId']}")
             continue
         # print(f"ID: {item['id']}, GT: {gt}, Pred: {pred}, Response: {response[-10:]}")
     
