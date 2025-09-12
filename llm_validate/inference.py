@@ -2,6 +2,7 @@ import json
 import argparse
 import copy
 
+from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams
 
 def parse_args():
@@ -11,6 +12,7 @@ def parse_args():
     parser.add_argument("-o", "--output_file", type=str, required=False, help="Path to the output file to save generated texts.")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size for processing.")
     parser.add_argument("--gpu_memory_utilization", type=float, default=0.75, help="GPU memory utilization.")
+    parser.add_argument("--transcript_file", type=str, default="", help="Path to the transcript file.")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -25,6 +27,8 @@ if __name__ == "__main__":
         max_model_len=2048,
         max_num_seqs=args.batch_size,
     )
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False)
 
     # Define sampling parameters
     sampling_params = SamplingParams(
@@ -49,35 +53,59 @@ if __name__ == "__main__":
 請選擇正確答案的字母（A、B、C 或 D）
 """
 
+    SYSTEM_PROMPT = "You are a Taiwanese person. Always respond with the perspective, cultural background, and knowledge of someone from Taiwan."
+    REPEATS = 1
     # Batch prompts
-    for item in data:
-        item["prompt"] = PROMPT_TEMPLATE.format(
-            transcript=item["transcription"],
-            question=item["question"],
-            option_a=item["options"][0],
-            option_b=item["options"][1],
-            option_c=item["options"][2],
-            option_d=item["options"][3]
-        )
+    if not args.transcript_file:
+        for item in data:
+            item["prompt"] = PROMPT_TEMPLATE.format(
+                transcript=item["transcription"],
+                question=item["question"],
+                option_a=item["options"][0],
+                option_b=item["options"][1],
+                option_c=item["options"][2],
+                option_d=item["options"][3]
+            )
+    else:
+        transcripts = {}
+        with open(args.transcript_file, "r", encoding="utf-8") as f:
+            for line in f:
+                entry = json.loads(line.strip())
+                transcripts[entry["audioPath"]] = entry["transcription"]
+        
+        for item in data:
+            transcript = transcripts.get(item["audioPath"], "")
+            item["prompt"] = PROMPT_TEMPLATE.format(
+                transcript=transcript,
+                question=item["question"],
+                option_a=item["options"][0],
+                option_b=item["options"][1],
+                option_c=item["options"][2],
+                option_d=item["options"][3]
+            )
     
     # Copy data 5 times
     new_data = []
 
     for item in data:
-        for _ in range(5):
+        for _ in range(REPEATS):
             new_data.append(copy.deepcopy(item))
 
     data = new_data
 
+    # Apply chat template
     prompts = [
-        item["prompt"] for item in data
+        tokenizer.apply_chat_template([
+            {"role": "system", "content": SYSTEM_PROMPT}, 
+            {"role": "user", "content": item["prompt"]}
+        ], add_generation_prompt=True, tokenize=False) for item in data
     ]
 
     # Generate responses
     outputs = llm.generate(prompts, sampling_params)
 
     for item, output in zip(data, outputs):
-        item["generation"] = output.outputs[0].text.strip()
+        item["prediction"] = output.outputs[0].text.strip()
 
     with open(args.output_file, "w", encoding="utf-8") as f:
         for item in data:

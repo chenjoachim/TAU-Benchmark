@@ -5,7 +5,6 @@ import time
 from typing import List, Dict, Optional
 import argparse
 
-import pandas as pd
 from tqdm import tqdm
 from dotenv import load_dotenv
 from google import genai
@@ -23,21 +22,25 @@ PROMPT_TEMPLATE = """根據音檔，回答以下單選題：
 AUDIO_DIR = "data/new"
 
 PRICING = {
-    "gemini-2.5-pro":{
+    "gemini-2.5-pro": {
         "input": 1.25e-6,
         "output": 1e-5,
         "audio_input": 1.25e-6,
     },
-    "gemini-2.5-flash":{
+    "gemini-2.5-flash": {
         "input": 0.3e-6,
         "output": 2.5e-6,
         "audio_input": 1e-6,
-    }
+    },
 }
 
 
 def evaluate(
-    client: genai.Client, row: dict, model_name: str, max_retries: int = 3,
+    client: genai.Client,
+    row: dict,
+    model_name: str,
+    max_retries: int = 3,
+    use_system_prompt: bool = False,
 ) -> tuple[str, float]:
     """Generate question for a single audio file with retry logic."""
     prompt = PROMPT_TEMPLATE.format(
@@ -72,7 +75,12 @@ def evaluate(
                     thinking_config=types.ThinkingConfig(
                         thinking_budget=8192,
                         # include_thoughts=True
-                    )
+                    ),
+                    system_instruction=(
+                        "You are a Taiwanese person. Always respond with the perspective, cultural background, and knowledge of someone from Taiwan."
+                        if use_system_prompt
+                        else None
+                    ),
                 ),
             )
             answer = response.text.strip()
@@ -83,7 +91,9 @@ def evaluate(
             input_cost = 0
             for modality in response.usage_metadata.prompt_tokens_details:
                 if modality.modality == types.Modality.AUDIO:
-                    input_cost += modality.token_count * PRICING[model_name]["audio_input"]
+                    input_cost += (
+                        modality.token_count * PRICING[model_name]["audio_input"]
+                    )
                 elif modality.modality == types.Modality.TEXT:
                     input_cost += modality.token_count * PRICING[model_name]["input"]
             total_cost = input_cost + output_cost
@@ -96,7 +106,7 @@ def evaluate(
         except Exception as e:
             print(f"Error on attempt {attempt + 1}: {e}")
             print(f"Attempt {attempt + 1} failed, retrying...")
-            time.sleep(2 ** attempt)  # Exponential backoff
+            time.sleep(2**attempt)  # Exponential backoff
 
     return "", 0.0
 
@@ -131,6 +141,11 @@ def parse_args():
         choices=["gemini-2.5-pro", "gemini-2.5-flash"],
         help="Model name to use for generation (default: gemini-2.5-pro).",
     )
+    parser.add_argument(
+        "--use_system_prompt",
+        action="store_true",
+        help="Whether to use a system prompt to guide the model's responses.",
+    )
     return parser.parse_args()
 
 
@@ -153,16 +168,18 @@ def main():
     total_cost = 0.0
 
     # Load input data from JSONL file
-    with open(args.input_file, 'r', encoding='utf-8') as f:
+    with open(args.input_file, "r", encoding="utf-8") as f:
         for line in f:
             if line.strip():  # Avoid empty lines
                 data.append(json.loads(line.strip()))
-    
+
     for entry in tqdm(data, desc="Processing Entries"):
-        answer, cost = evaluate(client, entry, model_name=args.model_name, max_retries=args.max_retries)
+        answer, cost = evaluate(
+            client, entry, model_name=args.model_name, max_retries=args.max_retries, use_system_prompt=args.use_system_prompt
+        )
         entry["prediction"] = answer
         total_cost += cost
-        with open(args.output_file, '+a', encoding='utf-8') as out_f:
+        with open(args.output_file, "+a", encoding="utf-8") as out_f:
             out_f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     print(f"Total cost of API calls: ${total_cost:.6f}")
