@@ -20,10 +20,18 @@ if __name__ == "__main__":
             data = [entry for entry in data if entry["uniqueId"] in subset_ids]
 
     print(f"Loaded {len(data)} entries from {args.input_file}")
+
+    single_hop_count = sum(1 for entry in data if entry["hopType"] == "Single-hop")
+    multi_hop_count = sum(1 for entry in data if entry["hopType"] == "Multi-hop")
+    print(f"Single-hop questions: {single_hop_count}, Multi-hop questions: {multi_hop_count}")
     
     correct_count = sum(1 for entry in data if entry["correct"])
+    single_hop_correct = sum(1 for entry in data if entry["correct"] and entry["hopType"] == "Single-hop")
+    multi_hop_correct = sum(1 for entry in data if entry["correct"] and entry["hopType"] == "Multi-hop")
     accuracy = correct_count / len(data)
-    print(f"Accuracy: {accuracy:.4f}")
+    single_hop_accuracy = single_hop_correct / single_hop_count if single_hop_count > 0 else 0
+    multi_hop_accuracy = multi_hop_correct / multi_hop_count if multi_hop_count > 0 else 0
+    print(f"Accuracy: {accuracy:.4f}, Single-hop Accuracy: {single_hop_accuracy:.4f}, Multi-hop Accuracy: {multi_hop_accuracy:.4f}")
 
     if args.output_file:
         with open(args.output_file, "w", encoding='utf-8') as f:
